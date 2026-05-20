@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Highway Now v2</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#f4f4f4; --surface:#fff; --surface-2:#e8e8e8; --border:#e0e0e0;
+  --text:#161616; --text-2:#525252; --text-3:#8d8d8d;
+  --blue:#0f62fe; --blue-hover:#0353e9;
+  --red:#da1e28; --orange:#ff832b; --green:#198038; --yellow:#f1c21b;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:'IBM Plex Sans KR',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.4}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+header h1{font-size:18px;margin:0;font-weight:600;display:inline}
+.badge{display:inline-block;padding:2px 8px;border-radius:2px;font-size:11px;font-weight:500;background:var(--green);color:#fff;margin-left:8px;vertical-align:middle}
+.badge.demo{background:var(--orange)}
+.hdr-btn{background:none;border:1px solid var(--border);padding:6px 10px;font-family:inherit;font-size:14px;cursor:pointer;color:var(--text)}
+.hdr-btn:hover{background:var(--bg)}
+.hero{padding:16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.hero h2{font-size:22px;margin:0 0 4px;font-weight:700}
+.hero p{margin:0;color:var(--text-2);font-size:13px}
+.kpi{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.kpi-tile{background:var(--surface);padding:16px}
+.kpi-tile .label{font-size:12px;color:var(--text-2);margin-bottom:4px}
+.kpi-tile .value{font-size:28px;font-weight:600;line-height:1.1}
+.kpi-tile .unit{font-size:14px;color:var(--text-2);margin-left:4px;font-weight:400}
+nav.tabs{background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;scrollbar-width:none;position:sticky;top:49px;z-index:9}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{background:none;border:none;padding:12px 16px;font-size:14px;font-family:inherit;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs button.active{color:var(--text);border-bottom-color:var(--blue);font-weight:500}
+.panel{display:none;padding:16px}
+.panel.active{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface)}
+th,td{padding:8px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--border)}
+th{background:var(--surface-2);font-weight:500;color:var(--text-2)}
+tr:hover td{background:#fafafa}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.status-normal{background:var(--green)}
+.status-slow{background:var(--yellow)}
+.status-congested{background:var(--red)}
+.status-unknown{background:var(--text-3)}
+#map{height:600px;background:var(--surface);border:1px solid var(--border)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--border);padding:12px}
+.card .title{font-weight:500;margin-bottom:4px}
+.card .meta{color:var(--text-2);font-size:12px;margin-bottom:8px}
+.card .detail{font-size:13px;line-height:1.5}
+.card .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.tag{font-size:11px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);color:var(--text-2)}
+.tag.warn{background:#fff3e0;color:#b25800;border-color:#ffd6a3}
+.tag.danger{background:#fff0f1;color:var(--red);border-color:#ffb3b3}
+.tag.info{background:#edf5ff;color:#0043ce;border-color:#a6c8ff}
+select,input,button{font-family:inherit;font-size:14px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);color:var(--text)}
+select:focus,input:focus{outline:2px solid var(--blue);outline-offset:-2px}
+button.primary{background:var(--blue);color:#fff;border-color:var(--blue);cursor:pointer}
+button.primary:hover{background:var(--blue-hover)}
+.form-row{display:flex;gap:8px;align-items:end;margin-bottom:16px;flex-wrap:wrap}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;color:var(--text-2)}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.toolbar .spacer{flex:1}
+.toolbar .info{font-size:12px;color:var(--text-2)}
+.loading{text-align:center;padding:32px;color:var(--text-2)}
+.empty{text-align:center;padding:32px;color:var(--text-3)}
+.fab{position:fixed;bottom:20px;right:20px;width:64px;height:64px;border-radius:50%;background:var(--red);color:#fff;border:none;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:100}
+.fab:hover{background:#a2191f}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);width:100%;max-width:520px;max-height:85vh;overflow:auto}
+.modal-header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface)}
+.modal-body{padding:16px}
+.modal h3{margin:0;font-size:18px}
+.close-btn{background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-2);padding:0;line-height:1;width:32px;height:32px}
+.emergency-item{padding:10px;border:1px solid var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.emergency-item .info{flex:1;min-width:0}
+.emergency-item .name{font-weight:500}
+.emergency-item .sub{font-size:12px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.emergency-item a.call{padding:6px 12px;background:var(--red);color:#fff;text-decoration:none;font-weight:500;font-size:13px;white-space:nowrap}
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 16px;font-size:13px;z-index:1000;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
+.toast.show{opacity:1}
+.toll-result{font-size:14px}
+.toll-result .amount{font-size:32px;font-weight:600;color:var(--blue);margin:8px 0}
+@media (max-width:640px){
+  .kpi{grid-template-columns:repeat(2,1fr)}
+  .kpi-tile .value{font-size:22px}
+  #map{height:400px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Highway Now</h1><span class="badge" id="modeBadge">LIVE</span></div>
+  <div>
+    <button class="hdr-btn" id="refreshBtn" title="새로고침">새로고침</button>
+    <button class="hdr-btn" id="settingsBtn" title="설정">설정</button>
+  </div>
+</header>
+
+<section class="hero">
+  <h2>고속도로 실시간 현황</h2>
+  <p id="updatedAt">데이터 로딩 중...</p>
+</section>
+
+<div class="kpi">
+  <div class="kpi-tile"><div class="label">정체 구간</div><div><span class="value mono" id="kpiCongested">—</span><span class="unit">개</span></div></div>
+  <div class="kpi-tile"><div class="label">평균 속도</div><div><span class="value mono" id="kpiSpeed">—</span><span class="unit">km/h</span></div></div>
+  <div class="kpi-tile"><div class="label">사고/돌발</div><div><span class="value mono" id="kpiIncidents">—</span><span class="unit">건</span></div></div>
+  <div class="kpi-tile"><div class="label">진행 공사</div><div><span class="value mono" id="kpiConstruction">—</span><span class="unit">건</span></div></div>
+</div>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="routes" class="active">노선별 현황</button>
+  <button data-tab="map">지도</button>
+  <button data-tab="cities">도시간 시간</button>
+  <button data-tab="incidents">사고·통제</button>
+  <button data-tab="toll">통행료</button>
+  <button data-tab="rest">휴게소</button>
+  <button data-tab="station">주유소</button>
+</nav>
+
+<main>
+  <div class="panel active" id="panel-routes">
+    <div class="toolbar">
+      <select id="filterRoute"><option value="">전체 노선</option></select>
+      <select id="filterStatus">
+        <option value="">전체 상태</option>
+        <option value="congested">정체</option>
+        <option value="slow">서행</option>
+        <option value="normal">원활</option>
+      </select>
+      <span class="spacer"></span>
+      <span class="info" id="routesCount">—</span>
+    </div>
+    <div class="loading" id="routes-loading">데이터 로딩 중...</div>
+    <table id="routes-table" style="display:none">
+      <thead><tr><th>노선</th><th>구간</th><th>방향</th><th>속도</th><th>상태</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="panel-map"><div id="map"></div></div>
+
+  <div class="panel" id="panel-cities">
+    <div class="toolbar">
+      <select id="cityFrom"><option value="">전체 출발지</option></select>
+      <select id="cityTo"><option value="">전체 도착지</option></select>
+      <span class="spacer"></span>
+      <span class="info" id="citiesCount">—</span>
+    </div>
+    <div class="loading" id="cities-loading">데이터 로딩 중...</div>
+    <table id="cities-table" style="display:none">
+      <thead><tr><th>출발</th><th>도착</th><th>차종</th><th>평균</th><th>최소</th><th>최대</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="panel-incidents">
+    <div class="toolbar">
+      <select id="incidentType">
+        <option value="">전체 유형</option>
+        <option value="accident">사고</option>
+        <option value="breakdown">고장</option>
+        <option value="construction">공사</option>
+        <option value="congestion">정체</option>
+        <option value="weather">기상</option>
+        <option value="info">안내</option>
+      </select>
+      <span class="spacer"></span>
+      <span class="info" id="incidentCount">—</span>
+    </div>
+    <div class="loading" id="incidents-loading">데이터 로딩 중...</div>
+    <div class="cards" id="incidents-cards"></div>
+  </div>
+
+  <div class="panel" id="panel-toll">
+    <div class="form-row">
+      <div class="form-group">
+        <label>출발 영업소</label>
+        <select id="tollFrom"><option value="">선택</option></select>
+      </div>
+      <div class="form-group">
+        <label>도착 영업소</label>
+        <select id="tollTo"><option value="">선택</option></select>
+      </div>
+      <div class="form-group">
+        <label>차종</label>
+        <select id="tollCarType">
+          <option value="1">1종 (소형)</option>
+          <option value="2">2종 (중형)</option>
+          <option value="3">3종 (대형)</option>
+          <option value="4">4종 (대형화물)</option>
+          <option value="5">5종 (특수)</option>
+        </select>
+      </div>
+      <button class="primary" id="tollCalc">조회</button>
+    </div>
+    <div class="loading" id="toll-loading">통행료 데이터 로딩 중... (양이 많아 수 초 걸립니다)</div>
+    <div id="tollResult" class="card toll-result" style="display:none"></div>
+  </div>
+
+  <div class="panel" id="panel-rest">
+    <div class="toolbar">
+      <select id="restRoute"><option value="">전체 노선</option></select>
+      <input type="text" id="restSearch" placeholder="휴게소 이름 검색">
+      <span class="spacer"></span>
+      <span class="info" id="restCount">—</span>
+    </div>
+    <div class="loading" id="rest-loading">데이터 로딩 중...</div>
+    <div class="cards" id="rest-cards"></div>
+  </div>
+
+  <div class="panel" id="panel-station">
+    <div class="toolbar">
+      <select id="stationRoute"><option value="">전체 노선</option></select>
+      <select id="stationOilCompany"><option value="">전체 정유사</option></select>
+      <span class="spacer"></span>
+      <span class="info" id="stationCount">—</span>
+    </div>
+    <div class="loading" id="station-loading">데이터 로딩 중...</div>
+    <div class="cards" id="station-cards"></div>
+  </div>
+</main>
+
+<button class="fab" id="emergencyFab">긴급<br>호출</button>
+
+<div class="modal-overlay" id="emergencyModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>긴급 연락처</h3>
+      <button class="close-btn" data-close="emergencyModal">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="emergency-item">
+        <div class="info"><div class="name">소방·구급</div><div class="sub">119</div></div>
+        <a class="call" href="tel:119">전화</a>
+      </div>
+      <div class="emergency-item">
+        <div class="info"><div class="name">경찰</div><div class="sub">112</div></div>
+        <a class="call" href="tel:112">전화</a>
+      </div>
+      <div class="emergency-item">
+        <div class="info"><div class="name">한국도로공사 콜센터</div><div class="sub">1588-2504</div></div>
+        <a class="call" href="tel:1588-2504">전화</a>
+      </div>
+      <div id="nearbyAgencies"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>설정</h3>
+      <button class="close-btn" data-close="settingsModal">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px"><label>API 키 (data.ex.co.kr)</label><input type="text" id="apiKeyInput"></div>
+      <div class="form-group" style="margin-bottom:12px"><label>자동 새로고침 (초)</label><input type="number" id="refreshSecInput" min="10" max="300"></div>
+      <button class="primary" id="saveSettings">저장 후 새로고침</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const DEFAULT_KEY = '7224477583';
+const config = {
+  key: localStorage.getItem('hwy.key') || DEFAULT_KEY,
+  refreshSec: parseInt(localStorage.getItem('hwy.refresh') || '30')
+};
+const API = 'https://data.ex.co.kr/openapi';
+const URLS = {
+  traffic:     API+'/odtraffic/trafficAmountByRealtime',
+  congest:     API+'/odtraffic/trafficAmountByCongest',
+  sms:         API+'/burstInfo/realTimeSms',
+  cnstnPrss:   API+'/safeDriving/hiwayCnstnPrss',
+  toll:        API+'/toll/bhoinstIntoTollList',
+  cityTime:    API+'/trtm/realUnitTrtm',
+  restConv:    API+'/business/conveniServiceArea',
+  station:     API+'/business/curStateStation',
+  emergency:   API+'/ctsrMngmEtctPrcd/prmpHelpOrg'
+};
+
+// === API fetch (direct, no proxy — data.ex.co.kr returns CORS *) ===
+async function apiFetch(url, params={}){
+  const u = new URL(url);
+  u.searchParams.set('key', config.key);
+  u.searchParams.set('type', 'json');
+  for(const [k,v] of Object.entries(params)){
+    if(v!==undefined && v!==null && v!=='') u.searchParams.set(k, v);
+  }
+  const r = await fetch(u.toString());
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const data = await r.json();
+  const list = findArray(data);
+  return { list: list||[], count: parseInt(data.count) || (list?list.length:0), raw: data };
+}
+// Container key varies per endpoint: list / realTimeSMSList / prmpHelpOrgLists / realUnitTrtmVO / data.list ...
+function findArray(obj){
+  if(!obj || typeof obj!=='object') return null;
+  if(Array.isArray(obj.list)) return obj.list;
+  for(const k of Object.keys(obj)){
+    const v = obj[k];
+    if(Array.isArray(v)) return v;
+    if(v && typeof v==='object' && Array.isArray(v.list)) return v.list;
+  }
+  return null;
+}
+
+const state = { routes:[], incidents:[], cities:[], tollList:[], restAreas:[], stations:[], emergencyList:[] };
+
+// === Utilities ===
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>el.classList.remove('show'), 3500);
+}
+function speedToStatus(s){
+  const n = parseFloat(s);
+  if(isNaN(n)) return 'unknown';
+  if(n>=80) return 'normal';
+  if(n>=40) return 'slow';
+  return 'congested';
+}
+function statusLabel(s){return {normal:'원활',slow:'서행',congested:'정체',unknown:'—'}[s]||'—'}
+function dirLabel(c){return c==='S'?'시점방향':c==='E'?'종점방향':(c||'—')}
+function fmtMin(v){const n=parseFloat(v);return isNaN(n)?'—':n.toFixed(1)+' 분'}
+
+// === Tabs ===
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.onclick = ()=>{
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b===btn));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
+    onTab(tab);
+  };
+});
+let mapInited = false;
+function onTab(tab){
+  if(tab==='map' && !mapInited) initMap();
+  if(tab==='cities' && state.cities.length===0) loadCities();
+  if(tab==='toll' && state.tollList.length===0) loadToll();
+  if(tab==='rest' && state.restAreas.length===0) loadRest();
+  if(tab==='station' && state.stations.length===0) loadStations();
+}
+
+// === Live traffic (routes, incidents, KPIs, construction count) ===
+async function loadTraffic(){
+  try{
+    const [traffic, sms, cnstn] = await Promise.all([
+      apiFetch(URLS.traffic, {numOfRows:500}),
+      apiFetch(URLS.sms, {numOfRows:80}),
+      apiFetch(URLS.cnstnPrss, {numOfRows:1, cmcnCstrClssCd:'C02'})
+    ]);
+    state.routes = traffic.list;
+    state.incidents = sms.list;
+    const cong = traffic.list.filter(r=>{const n=parseFloat(r.speed);return !isNaN(n) && n>0 && n<40});
+    document.getElementById('kpiCongested').textContent = cong.length;
+    const speeds = traffic.list.map(r=>parseFloat(r.speed)).filter(n=>!isNaN(n) && n>0);
+    const avg = speeds.length ? Math.round(speeds.reduce((a,b)=>a+b,0)/speeds.length) : 0;
+    document.getElementById('kpiSpeed').textContent = avg;
+    document.getElementById('kpiIncidents').textContent = sms.count || sms.list.length;
+    document.getElementById('kpiConstruction').textContent = cnstn.count || 0;
+    renderRoutes();
+    renderIncidents();
+    if(mapInited) renderMapMarkers();
+    const d = new Date();
+    document.getElementById('updatedAt').textContent = '최종 업데이트 '+d.toLocaleTimeString('ko-KR')+' · 자동 새로고침 '+config.refreshSec+'초';
+  }catch(e){
+    console.error('loadTraffic', e);
+    toast('실시간 데이터 로드 실패: '+e.message);
+    document.getElementById('modeBadge').textContent = 'OFFLINE';
+    document.getElementById('modeBadge').classList.add('demo');
+  }
+}
+
+function renderRoutes(){
+  const sel = document.getElementById('filterRoute');
+  if(sel.options.length===1){
+    const uniq = [...new Set(state.routes.map(r=>r.routeName).filter(Boolean))].sort();
+    uniq.forEach(rn=>sel.add(new Option(rn,rn)));
+  }
+  const rf = sel.value;
+  const sf = document.getElementById('filterStatus').value;
+  let filtered = state.routes;
+  if(rf) filtered = filtered.filter(r=>r.routeName===rf);
+  if(sf) filtered = filtered.filter(r=>speedToStatus(r.speed)===sf);
+  const tbody = document.querySelector('#routes-table tbody');
+  tbody.innerHTML = '';
+  filtered.slice(0,300).forEach(r=>{
+    const st = speedToStatus(r.speed);
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>'+esc(r.routeName)+'</td><td>'+esc(r.conzoneName)+'</td><td>'+esc(dirLabel(r.updownTypeCode))+'</td><td class="mono">'+esc(r.speed)+' km/h</td><td><span class="status-dot status-'+st+'"></span>'+statusLabel(st)+'</td>';
+    tbody.appendChild(tr);
+  });
+  document.getElementById('routes-loading').style.display = 'none';
+  document.getElementById('routes-table').style.display = '';
+  document.getElementById('routesCount').textContent = filtered.length+'건 / 전체 '+state.routes.length+'건';
+}
+document.getElementById('filterRoute').onchange = renderRoutes;
+document.getElementById('filterStatus').onchange = renderRoutes;
+
+// === Incidents (실시간 문자 SMS) ===
+function classifyIncident(code){
+  const c = String(code||'');
+  if(['00','02','16'].includes(c)) return {type:'accident', label:'사고', cls:'danger'};
+  if(c==='01') return {type:'breakdown', label:'고장', cls:'warn'};
+  if(['03','30','31','75'].includes(c)) return {type:'construction', label:'공사', cls:'warn'};
+  if(c==='04') return {type:'congestion', label:'정체', cls:'warn'};
+  if(['06','09','17','18','19','20','21'].includes(c)) return {type:'weather', label:'기상', cls:'warn'};
+  if(c==='74') return {type:'info', label:'휴게소혼잡', cls:'info'};
+  return {type:'info', label:'안내', cls:'info'};
+}
+function renderIncidents(){
+  const tf = document.getElementById('incidentType').value;
+  let arr = state.incidents;
+  if(tf) arr = arr.filter(i=>classifyIncident(i.accTypeCode).type===tf);
+  const cont = document.getElementById('incidents-cards');
+  cont.innerHTML = '';
+  if(arr.length===0){
+    cont.innerHTML = '<div class="empty">표시할 정보가 없습니다.</div>';
+  }else{
+    arr.slice(0,80).forEach(it=>{
+      const cls = classifyIncident(it.accTypeCode);
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML =
+        '<div class="title">'+esc(it.roadNM||it.nosunNM||'고속도로')+' · '+esc(it.startEndTypeCode||'')+'</div>'+
+        '<div class="meta">'+esc(it.accDate||'')+' '+esc(it.accHour||'')+'</div>'+
+        '<div class="detail">'+esc(it.smsText||'')+'</div>'+
+        '<div class="tags"><span class="tag '+cls.cls+'">'+cls.label+'</span>'+
+        (it.accProcessNM?'<span class="tag">'+esc(it.accProcessNM)+'</span>':'')+'</div>';
+      cont.appendChild(div);
+    });
+  }
+  document.getElementById('incidents-loading').style.display = 'none';
+  document.getElementById('incidentCount').textContent = arr.length+'건 / 전체 '+state.incidents.length+'건';
+}
+document.getElementById('incidentType').onchange = renderIncidents;
+
+// === Map (Leaflet, major route summary markers) ===
+let map;
+function initMap(){
+  map = L.map('map').setView([36.5, 127.8], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:18, attribution:'© OpenStreetMap'}).addTo(map);
+  mapInited = true;
+  renderMapMarkers();
+}
+const ROUTE_CENTERS = {
+  '경부선':[36.5,127.8],'서해안선':[36.2,126.7],'중부선':[36.7,127.5],'영동선':[37.5,128.4],
+  '남해선':[35.1,127.9],'중부내륙선':[36.5,128.0],'서울양양선':[37.7,128.3],
+  '호남선':[35.5,127.0],'중앙선':[36.6,128.4],'당진영덕선':[36.5,128.6],
+  '제2경인선':[37.4,126.7],'수도권제1순환선':[37.5,127.0],'수도권제2순환선':[37.4,127.1],
+  '평택파주선':[37.2,126.9],'평택제천선':[36.9,127.3],'서울세종선':[37.0,127.2],
+  '논산천안선':[36.5,127.1],'대구부산선':[35.6,128.5],'고창담양선':[35.3,126.8],
+  '광주대구선':[35.6,127.5],'서산영덕선':[36.5,128.5],'순천완주선':[35.4,127.3],
+  '동해선':[37.4,129.2],'무안광주선':[35.0,126.5]
+};
+function renderMapMarkers(){
+  if(!map) return;
+  map.eachLayer(l=>{ if(l instanceof L.CircleMarker) map.removeLayer(l); });
+  const by = {};
+  state.routes.forEach(r=>{
+    const rn = r.routeName; if(!rn) return;
+    if(!by[rn]) by[rn] = {n:0, cong:0, sp:[]};
+    by[rn].n++;
+    const sp = parseFloat(r.speed);
+    if(!isNaN(sp) && sp>0){ by[rn].sp.push(sp); if(sp<40) by[rn].cong++; }
+  });
+  Object.entries(by).forEach(([rn,info])=>{
+    const c = ROUTE_CENTERS[rn]; if(!c) return;
+    const avg = info.sp.length ? Math.round(info.sp.reduce((a,b)=>a+b,0)/info.sp.length) : 0;
+    const color = avg>=80?'#198038':avg>=40?'#f1c21b':avg>0?'#da1e28':'#8d8d8d';
+    const radius = Math.min(8 + Math.sqrt(info.n)*1.4, 24);
+    L.circleMarker(c, {radius, color:'#fff', weight:2, fillColor:color, fillOpacity:.85})
+      .bindPopup('<b>'+esc(rn)+'</b><br>평균 '+avg+' km/h<br>구간 '+info.n+'개<br>정체 '+info.cong+'개')
+      .addTo(map);
+  });
+}
+
+// === Cities (영업소간 통행시간) — 페이지당 99건 캡이라 분산 fetch로 다양성 확보 ===
+async function loadCities(){
+  try{
+    const pages = [1, 70, 140, 210, 280, 350, 420, 490, 560, 630];
+    const results = await Promise.all(pages.map(p =>
+      apiFetch(URLS.cityTime, {numOfRows:100, pageNo:p}).catch(()=>({list:[]}))
+    ));
+    state.cities = results.flatMap(r => r.list);
+    renderCities();
+  }catch(e){ toast('도시간 시간 로드 실패: '+e.message) }
+}
+function renderCities(){
+  const fromSel = document.getElementById('cityFrom');
+  const toSel = document.getElementById('cityTo');
+  if(fromSel.options.length===1){
+    const froms = [...new Set(state.cities.map(c=>c.startUnitNm).filter(Boolean))].sort();
+    const tos = [...new Set(state.cities.map(c=>c.endUnitNm).filter(Boolean))].sort();
+    froms.forEach(n=>fromSel.add(new Option(n,n)));
+    tos.forEach(n=>toSel.add(new Option(n,n)));
+  }
+  const ff = fromSel.value, tf = toSel.value;
+  let arr = state.cities;
+  if(ff) arr = arr.filter(c=>c.startUnitNm===ff);
+  if(tf) arr = arr.filter(c=>c.endUnitNm===tf);
+  const tbody = document.querySelector('#cities-table tbody');
+  tbody.innerHTML = '';
+  arr.slice(0,200).forEach(c=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>'+esc(c.startUnitNm)+'</td><td>'+esc(c.endUnitNm)+'</td><td>'+esc(c.tcsCarTypeName)+'</td><td class="mono">'+fmtMin(c.timeAvg)+'</td><td class="mono">'+fmtMin(c.timeMin)+'</td><td class="mono">'+fmtMin(c.timeMax)+'</td>';
+    tbody.appendChild(tr);
+  });
+  document.getElementById('cities-loading').style.display = 'none';
+  document.getElementById('cities-table').style.display = '';
+  document.getElementById('citiesCount').textContent = arr.length+'건 / 전체 '+state.cities.length+'건';
+}
+document.getElementById('cityFrom').onchange = renderCities;
+document.getElementById('cityTo').onchange = renderCities;
+
+// === Toll — 영업소 목록은 서울(101) 기준 7페이지 fetch, 계산은 선택 시 단일 호출 ===
+async function loadToll(){
+  try{
+    const pages = [1,2,3,4,5,6,7];
+    const results = await Promise.all(pages.map(p =>
+      apiFetch(URLS.toll, {numOfRows:100, pageNo:p, dprtrTolofCd:'101'}).catch(()=>({list:[]}))
+    ));
+    const all = results.flatMap(r => r.list);
+    const stations = new Map();
+    all.forEach(t => { if(t.arrvTolofCd && t.arrvTolofNm) stations.set(t.arrvTolofCd, t.arrvTolofNm.trim()); });
+    const sorted = [...stations.entries()].sort((a,b)=>a[1].localeCompare(b[1],'ko'));
+    const fromSel = document.getElementById('tollFrom');
+    const toSel = document.getElementById('tollTo');
+    sorted.forEach(([c,n])=>{ fromSel.add(new Option(n,c)); toSel.add(new Option(n,c)); });
+    state.tollList = all;
+    document.getElementById('toll-loading').style.display = 'none';
+    toast('통행료 영업소 '+stations.size+'개 로드');
+  }catch(e){ toast('통행료 로드 실패: '+e.message) }
+}
+document.getElementById('tollCalc').onclick = async ()=>{
+  const f = document.getElementById('tollFrom').value;
+  const t = document.getElementById('tollTo').value;
+  const ct = document.getElementById('tollCarType').value;
+  if(!f || !t){ toast('출발/도착 영업소를 선택하세요'); return; }
+  if(f===t){ toast('출발과 도착이 같습니다'); return; }
+  const res = document.getElementById('tollResult');
+  res.style.display = '';
+  res.innerHTML = '<div class="detail">조회 중...</div>';
+  try{
+    const r = await apiFetch(URLS.toll, {dprtrTolofCd:f, arrvTolofCd:t, numOfRows:5});
+    const m = r.list[0];
+    if(!m){
+      res.innerHTML = '<div class="title">결과 없음</div><div class="detail">해당 구간 데이터가 없습니다.</div>';
+      return;
+    }
+    const amt = m['nrmlKnd'+ct+'Amt'];
+    const fromName = document.getElementById('tollFrom').selectedOptions[0].textContent;
+    const toName = document.getElementById('tollTo').selectedOptions[0].textContent;
+    const dist = parseFloat(m.crgw4SumDstne) || parseFloat(m.crgw2SumDstne) || parseFloat(m.crgw6SumDstne) || 0;
+    const time = (parseInt(m.hourUntDrveHour||0)*60 + parseInt(m.mmUntDrveHour||0));
+    res.innerHTML =
+      '<div class="title">'+esc(fromName)+' → '+esc(toName)+'</div>'+
+      '<div class="meta">'+esc(m.hoinstNm||'한국도로공사')+' · 거리 '+dist.toFixed(1)+' km'+(time?' · 예상 '+time+'분':'')+'</div>'+
+      '<div class="amount mono">₩'+parseInt(amt||0).toLocaleString()+'</div>'+
+      '<div class="detail mono">'+ct+'종 정상요금</div>';
+  }catch(e){
+    res.innerHTML = '<div class="title">조회 실패</div><div class="detail">'+esc(e.message)+'</div>';
+  }
+};
+
+// === Rest Areas ===
+async function loadRest(){
+  try{
+    const r = await apiFetch(URLS.restConv, {numOfRows:500});
+    state.restAreas = r.list;
+    const sel = document.getElementById('restRoute');
+    [...new Set(r.list.map(x=>x.routeName).filter(Boolean))].sort().forEach(rn=>sel.add(new Option(rn,rn)));
+    renderRest();
+  }catch(e){ toast('휴게소 로드 실패: '+e.message) }
+}
+function renderRest(){
+  const rf = document.getElementById('restRoute').value;
+  const sf = document.getElementById('restSearch').value.toLowerCase();
+  let arr = state.restAreas;
+  if(rf) arr = arr.filter(x=>x.routeName===rf);
+  if(sf) arr = arr.filter(x=>(x.serviceAreaName||'').toLowerCase().includes(sf));
+  const cont = document.getElementById('rest-cards');
+  cont.innerHTML = '';
+  arr.slice(0,300).forEach(x=>{
+    const conv = (x.convenience||'').split('|').filter(Boolean);
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML =
+      '<div class="title">'+esc(x.serviceAreaName||'')+'</div>'+
+      '<div class="meta">'+esc(x.routeName||'')+(x.direction?' · '+esc(x.direction):'')+'</div>'+
+      (x.brand?'<div class="detail">브랜드: '+esc(x.brand)+'</div>':'')+
+      (x.telNo?'<div class="detail">'+esc(x.telNo)+'</div>':'')+
+      '<div class="tags">'+
+      conv.slice(0,8).map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+
+      (x.maintenanceYn==='O'?'<span class="tag warn">정비</span>':'')+
+      (x.truckSaYn==='O'?'<span class="tag warn">화물휴게소</span>':'')+
+      '</div>';
+    cont.appendChild(div);
+  });
+  document.getElementById('rest-loading').style.display = 'none';
+  document.getElementById('restCount').textContent = arr.length+'건 / 전체 '+state.restAreas.length+'건';
+}
+document.getElementById('restRoute').onchange = renderRest;
+document.getElementById('restSearch').oninput = renderRest;
+
+// === Stations ===
+async function loadStations(){
+  try{
+    const r = await apiFetch(URLS.station, {numOfRows:500});
+    state.stations = r.list;
+    const rsel = document.getElementById('stationRoute');
+    const osel = document.getElementById('stationOilCompany');
+    [...new Set(r.list.map(x=>x.routeName).filter(Boolean))].sort().forEach(n=>rsel.add(new Option(n,n)));
+    [...new Set(r.list.map(x=>x.oilCompany).filter(Boolean))].sort().forEach(n=>osel.add(new Option(n,n)));
+    renderStations();
+  }catch(e){ toast('주유소 로드 실패: '+e.message) }
+}
+function renderStations(){
+  const rf = document.getElementById('stationRoute').value;
+  const of_ = document.getElementById('stationOilCompany').value;
+  let arr = state.stations;
+  if(rf) arr = arr.filter(x=>x.routeName===rf);
+  if(of_) arr = arr.filter(x=>x.oilCompany===of_);
+  const cont = document.getElementById('station-cards');
+  cont.innerHTML = '';
+  arr.slice(0,300).forEach(x=>{
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML =
+      '<div class="title">'+esc(x.serviceAreaName||'')+'</div>'+
+      '<div class="meta">'+esc(x.routeName||'')+' · '+esc(x.direction||'')+' · '+esc(x.oilCompany||'')+'</div>'+
+      '<table style="width:100%;background:transparent;margin-top:8px"><tbody>'+
+      '<tr><td style="border:0;padding:2px 0">휘발유</td><td class="mono" style="border:0;padding:2px 0;text-align:right">'+esc(x.gasolinePrice||'—')+'</td></tr>'+
+      '<tr><td style="border:0;padding:2px 0">디젤</td><td class="mono" style="border:0;padding:2px 0;text-align:right">'+esc(x.diselPrice||'—')+'</td></tr>'+
+      '<tr><td style="border:0;padding:2px 0">LPG</td><td class="mono" style="border:0;padding:2px 0;text-align:right">'+esc(x.lpgPrice||'—')+'</td></tr>'+
+      '</tbody></table>'+
+      (x.lpgYn==='Y'?'<div class="tags"><span class="tag">LPG 충전</span></div>':'');
+    cont.appendChild(div);
+  });
+  document.getElementById('station-loading').style.display = 'none';
+  document.getElementById('stationCount').textContent = arr.length+'건 / 전체 '+state.stations.length+'건';
+}
+document.getElementById('stationRoute').onchange = renderStations;
+document.getElementById('stationOilCompany').onchange = renderStations;
+
+// === Emergency (긴급호출) — 한국도로공사 API의 phoneNum 필드는 대부분 빈값이므로 기관 정보만 표시 ===
+async function loadEmergency(){
+  try{
+    const r = await apiFetch(URLS.emergency, {numOfRows:100});
+    state.emergencyList = r.list;
+  }catch(e){ console.warn('emergency load failed', e) }
+}
+document.getElementById('emergencyFab').onclick = ()=>{
+  document.getElementById('emergencyModal').classList.add('show');
+  const nearby = document.getElementById('nearbyAgencies');
+  nearby.innerHTML = '';
+  if(state.emergencyList.length===0) return;
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'margin:16px 0 8px;font-size:12px;color:#525252;border-top:1px solid #e0e0e0;padding-top:12px';
+  hdr.textContent = '인근 구조기관 (상위 10개 · 119/112로 전화)';
+  nearby.appendChild(hdr);
+  state.emergencyList.slice(0,10).forEach(it=>{
+    const tel = (it.phoneNum||'').replace(/[\s-]/g,'');
+    const div = document.createElement('div');
+    div.className = 'emergency-item';
+    div.innerHTML =
+      '<div class="info"><div class="name">'+esc(it.orgNm||'')+'</div><div class="sub">'+esc(it.orgCtgr||'')+(it.addr?' · '+esc(it.addr):'')+'</div></div>'+
+      (tel?'<a class="call" href="tel:'+esc(tel)+'">'+esc(it.phoneNum)+'</a>':'');
+    nearby.appendChild(div);
+  });
+};
+
+// === Modal close ===
+document.querySelectorAll('[data-close]').forEach(b=>{
+  b.onclick = ()=>document.getElementById(b.dataset.close).classList.remove('show');
+});
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.onclick = e=>{ if(e.target===o) o.classList.remove('show'); };
+});
+
+// === Settings ===
+document.getElementById('settingsBtn').onclick = ()=>{
+  document.getElementById('apiKeyInput').value = config.key;
+  document.getElementById('refreshSecInput').value = config.refreshSec;
+  document.getElementById('settingsModal').classList.add('show');
+};
+document.getElementById('saveSettings').onclick = ()=>{
+  const k = document.getElementById('apiKeyInput').value.trim() || DEFAULT_KEY;
+  const r = parseInt(document.getElementById('refreshSecInput').value) || 30;
+  localStorage.setItem('hwy.key', k);
+  localStorage.setItem('hwy.refresh', String(r));
+  document.getElementById('settingsModal').classList.remove('show');
+  toast('설정 저장됨. 새로고침합니다.');
+  setTimeout(()=>location.reload(), 600);
+};
+
+document.getElementById('refreshBtn').onclick = ()=>{
+  toast('새로고침 중...');
+  loadTraffic();
+};
+
+// === Boot ===
+let refreshTimer;
+(async ()=>{
+  await loadTraffic();
+  loadEmergency();
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(loadTraffic, config.refreshSec*1000);
+})();
+</script>
+</body>
+</html>
